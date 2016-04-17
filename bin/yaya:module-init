@@ -1,0 +1,203 @@
+#!/usr/bin/env node
+
+const fs = require('fs');
+const path = require('path');
+
+const name = path.basename(process.cwd());
+
+const path_to_here = process.argv[1];
+
+const relative = path.relative(
+  process.cwd(),
+  path.dirname(path.dirname(path_to_here))
+);
+
+const path_to_app = path.dirname(relative);
+
+const actions = `/*
+ *  @flow weak
+ *  @yaya:module ${name}
+ *  @yaya:component Action
+ */
+
+import * as types from './constants';
+
+// #EXAMPLE of an action function (don't forget to export)
+// export function myAction(params) {
+//   return (dispatch) => dispatch({
+//     type: types.MY_ACTION,
+//     params,
+//   });
+// }
+`;
+
+const constants = `/*
+ *  @flow weak
+ *  @yaya:module ${name}
+ *  @yaya:component Constant
+ */
+
+// export const MY_ACTION = "MY_ACTION";
+`;
+
+const flow = `/*
+ *  @flow weak
+ *  @yaya:module ${name}
+ *  @yaya:component Flow
+ */
+
+// #EXAMPLE of a deserialized data from JSON API
+export type DESERIALIZED = {
+  id: string,
+};
+
+// #EXAMPLE of a store. There can be more than 1 store.
+export type STORE = {
+//   loading?: boolean,
+//   loaded?: boolean,
+//   error?: Error,
+//   data: Object|Array<Object>,
+//   current: Object,
+};
+
+// #EXAMPLE of action passsed to reducer function
+export type ACTION = {
+  type: string,
+//   params: Object,
+};
+
+// #EXAMPLE of flow for component's props
+export type PROPS = {
+  actions: Object,
+  dispatch: Function,
+  ${name}: STORE,
+};
+
+// #EXAMPLE of flow for component's state
+export type STATE = {
+  updated: boolean,
+};
+`;
+
+const container = `/*
+ *  @flow weak
+ *  @yaya:module ${name}
+ *  @yaya:component Container
+ */
+
+import makeContainer from '${path_to_app}/Util/Lib/makeContainer';
+import * as actions${name} from './actions';
+import ${name} from './view';
+
+const stores = ['${name}'];
+
+const actions = {...actions${name},};
+
+export default makeContainer(actions, stores, ${name});
+`;
+
+const reducer = `/*
+ *  @flow weak
+ *  @yaya:module ${name}
+ *  @yaya:component Reducer
+ */
+
+import _ from 'lodash';
+import * as types from './constants';
+import type {STORE, ACTION} from './flow';
+
+const initial_state: STORE = {
+};
+
+export default function reducer(state: STORE = initial_state, action: ACTION)
+: STORE {
+  switch (action.type) {
+  // case types.MY_ACTION:
+  //   return {...state,};
+  default:
+    return state;
+  }
+}
+`;
+
+const view = `/*
+ *  @flow weak
+ *  @yaya:module ${name}
+ *  @yaya:component View
+ */
+
+import React, {Component, Text} from 'react-native';
+import _ from 'lodash';
+import style from './style';
+import type {PROPS, STATE, STORE} from './flow';
+
+export default class ${name} extends Component {
+
+  _ready = {updated: 1};
+
+  isReady() {
+    return _.find(this.state, this._ready);
+  }
+
+  state: STATE = {
+    updated: 0
+  };
+
+  componentWillReceiveProps(next_props: PROPS) {
+    this.setState({updated: ++this.state.updated});
+  }
+
+  render(): Component {
+    return (
+      <Text>
+        Hello! I am the Yaya component of the ${name} module.
+        Find me here ${process.cwd()}.
+        Enjoy coding!
+      </Text>
+    );
+  }
+}
+`;
+
+const style = `/*
+ *  @flow weak
+ *  @yaya:module ${name}
+ *  @yaya:component Style
+ */
+
+import {StyleSheet} from 'react-native';
+import * as global_style from '${path_to_app}/Util/Style';
+
+const style = {
+  container: {
+    ...global_style.mixins.container,
+    ...global_style.methods.flex(),
+    backgroundColor: global_style.vars.colors.brand,
+  },
+};
+
+export default StyleSheet.create(style);
+`;
+
+function write(file, source) {
+  return new Promise((resolve, reject) => {
+    const stream = fs.createWriteStream(file);
+    stream
+      .on('error', reject)
+      .on('finish', resolve);
+    stream.write(source);
+    stream.end();
+  });
+}
+
+Promise.all([
+  write('actions.js', actions),
+  write('constants.js', constants),
+  write('flow.js', flow),
+  write('container.js', container),
+  write('reducer.js', reducer),
+  write('view.js', view),
+  write('style.js', style),
+])
+.then(() => console.log('√'))
+.catch(error => console.log(error.stack));
